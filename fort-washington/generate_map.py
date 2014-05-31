@@ -1,7 +1,8 @@
 # generate overall world
 import os
 import sys
-from PIL import Image
+# from PIL import Image
+from osgeo import gdal
 from pymclevel import mclevel, box, materials, nbt
 from pymclevel.materials import alphaMaterials as m
 
@@ -106,32 +107,37 @@ y_min = 12
 
 print "Loading bitmaps for %s" % filename_prefix
 data = dict(elevation=[], features=[])
-for t in 'elevation', 'features':
+for t in ('elevation'):
     filename = filename_prefix + "-" + t + ".tif"
     if not os.path.exists(filename):
         print "Could not load image file %s!" % filename
         sys.exit()
-    img = Image.open(filename, "r")
-    width, height = img.size
+    img = gdal.open(filename)
+    width = img.RasterXSize
+    height = img.RasterYSize
+    imgarray = img.ReadAsArray
     for i in range(max(width, truncate_size)):
         row = []
         for j in range(max(height, truncate_size)):
-            pixel = img.getpixel((i,j))
-            value = pixel[0]
+            pixel = imgarray[i, j]
+            value = pixel
             if t == 'features':
+                # don't go here pls
+                value = pixel[0]    
                 value = (value, pixel[1]) # block ID, block data
             if t == 'elevation':
+                # this one works though :D
                 elevation_min = min(value, elevation_min)
                 elevation_max = max(value, elevation_max)
             row.append(value)
         data[t].append(row)
 
 elevation= data['elevation']
-material = data['features']
+# material = data['features']
 
 if truncate_size:
     elevation = elevation[x_offset:x_offset+truncate_size]
-    material = material[x_offset:x_offset+truncate_size]
+    # material = material[x_offset:x_offset+truncate_size]
 
 # Scale the height map so that it covers a good range of Minecraft's
 # available elevation
@@ -229,9 +235,9 @@ max_height = (world.Height-elevation_min) * scale_factor
 print "Populating chunks."
 for x, row in enumerate(elevation):
     for z, y in enumerate(row):
-        block_id, ignore = material[x][z]
+        # block_id, ignore = material[x][z]
 
-        block_id, block_data, depth = block_id_lookup[block_id]
+        block_id, block_data, depth = block_id_lookup[0]
         y = int(y * scale_factor)
         actual_y = y + y_min
         if actual_y > peak[1] or (peak[1] == 255 and y != 0):
